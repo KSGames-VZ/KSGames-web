@@ -35,20 +35,20 @@ function calculateSimilarity(str1: string, str2: string): number {
 
     const w1 = n1.split(" ");
     const w2 = n2.split(" ");
-
     const common = w1.filter((w) => w2.includes(w)).length;
     const total = Math.max(w1.length, w2.length);
     return common / total;
 }
 
 /**
- * Devuelve una key estándar interna:
- * nes, super-nintendo, nintendo-64, gamecube, wii, wii-u, gameboy, game-boy-advance, nintendo-ds, nintendo-3ds, playstation, playstation-2
+ * Key estándar interna:
+ * nes, super-nintendo, nintendo-64, gamecube, wii, wii-u,
+ * gameboy, game-boy-advance, nintendo-ds, nintendo-3ds,
+ * playstation, playstation-2
  */
 function normalizePlatform(input: string): string {
     const s = slugify(input);
 
-    // tus códigos (como vienen del front o BD)
     const direct: Record<string, string> = {
         nes: "nes",
         snes: "super-nintendo",
@@ -66,13 +66,14 @@ function normalizePlatform(input: string): string {
         gba: "game-boy-advance",
         "game-boy-advance": "game-boy-advance",
         ds: "nintendo-ds",
+        nds: "nintendo-ds",
         "nintendo-ds": "nintendo-ds",
         "3ds": "nintendo-3ds",
         "nintendo-3ds": "nintendo-3ds",
         ps1: "playstation",
         psx: "playstation",
-        playstation: "playstation",
         psone: "playstation",
+        playstation: "playstation",
         ps2: "playstation-2",
         "playstation-2": "playstation-2",
         playstation2: "playstation-2",
@@ -80,7 +81,6 @@ function normalizePlatform(input: string): string {
 
     if (direct[s]) return direct[s];
 
-    // aliases “largos” (lo que suele venir en PriceCharting / URLs / textos)
     const aliasGroups: Record<string, string[]> = {
         nes: ["nintendo-entertainment-system", "nintendo-nes", "famicom"],
         "super-nintendo": [
@@ -108,7 +108,7 @@ function normalizePlatform(input: string): string {
         if (aliases.some((a) => s === a || s.includes(a) || a.includes(s))) return standard;
     }
 
-    return s; // fallback
+    return s;
 }
 
 function parseMoney(text: string): number {
@@ -160,7 +160,7 @@ async function fetchHtml(url: string, referer?: string) {
         "User-Agent": getRandomAgent(),
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate", // evita br
+        "Accept-Encoding": "gzip, deflate",
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
         Connection: "close",
@@ -194,9 +194,10 @@ export async function GET(req: NextRequest) {
     try {
         await delay(200 + Math.random() * 250);
 
-        // Mejorar el buscador: combinar título + plataforma normalizada (ayuda muchísimo)
-        const q = `${title} ${normalizedSearchPlatform}`.trim();
-        const searchUrl = `https://www.pricecharting.com/search-products?type=prices&q=${encodeURIComponent(q)}`;
+        // TU LÓGICA: buscar SOLO por el título
+        const searchUrl = `https://www.pricecharting.com/search-products?type=prices&q=${encodeURIComponent(
+            title
+        )}`;
 
         // --- STEP 1: Search ---
         let search = await fetchHtml(searchUrl);
@@ -253,17 +254,14 @@ export async function GET(req: NextRequest) {
 
             const titleScore = calculateSimilarity(title, gameTitle);
 
-            const normalizedGamePlatform = normalizePlatform(gamePlatformText);
-            const platformMatches =
-                !normalizedSearchPlatform ||
-                normalizedSearchPlatform.length < 2 ||
-                normalizedGamePlatform === normalizedSearchPlatform;
+            // TU LÓGICA: platform match estricto contra tu normalización
+            const platformMatches = normalizePlatform(gamePlatformText) === normalizedSearchPlatform;
 
-            const platformBonus = platformMatches ? 0.35 : -0.05;
-            const finalScore = titleScore + platformBonus;
+            // TU LÓGICA: bonus 0.3 si plataforma matchea
+            const finalScore = titleScore + (platformMatches ? 0.3 : 0);
 
-            // acepta si el título es bueno, aunque plataforma venga rara
-            if (titleScore >= 0.65 || (titleScore >= 0.5 && platformMatches)) {
+            // TU LÓGICA: umbrales originales
+            if ((titleScore >= 0.5 && platformMatches) || titleScore >= 0.85) {
                 candidates.push({
                     link: link.startsWith("http") ? link : `https://www.pricecharting.com${link}`,
                     title: gameTitle,
@@ -331,11 +329,17 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        // 50% obligatorio
         const MARGIN = 0.5;
 
+        // Mapping EXACTO a tus botones:
+        // 1) Loose
+        // 2) Item & Box
+        // 3) Complete (CIB)
+        // 4) New
         const finalPrices = {
             loose: Math.round(marketLoose * MARGIN),
-            complete: Math.round(marketItemBox * MARGIN),
+            itemBox: Math.round(marketItemBox * MARGIN),
             cib: Math.round(marketComplete * MARGIN),
             new: Math.round(marketNew * MARGIN),
             matchedTitle: bestMatch.title,
@@ -347,7 +351,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(finalPrices, {
             status: 200,
             headers: {
-                // mientras desarrollas: evita cache (cuando ya esté estable, puedes volver a s-maxage)
                 "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
                 Pragma: "no-cache",
                 Expires: "0",
