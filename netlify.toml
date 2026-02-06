@@ -3,14 +3,19 @@
   publish = ".next"
 
 [build.environment]
+  # Esta es la forma correcta de definir la versión de Node en Netlify
+  NODE_VERSION = "20"
   NEXT_USE_NETLIFY_EDGE_SSR = "true"
 
 [[headers]]
   for = "/api/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
+    # Esto asegura que Netlify cachee tus precios de Resident Evil por 7 días
     Cache-Control = "public, s-maxage=604800, stale-while-revalidate=86400"
 
 [functions]
-  node_version = "20"
+  # Eliminamos node_version de aquí porque ya está arriba en build.environment
   external_node_modules = ["axios", "cheerio"]
+  # Aumentamos el tiempo de espera porque el scraper a veces tarda
+  timeout = 20
