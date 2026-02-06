@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   description: "Vende tus juegos de N64, SNES, PS1 y más. ¡Cotiza al instante!",
 };
 
+import { DeviceProvider } from "@/context/DeviceContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -20,7 +22,9 @@ export default function RootLayout({
     <html lang="es" className="dark">
       <body className={`${inter.className} bg-black text-slate-200 antialiased selection:bg-amber-500/30 selection:text-amber-100`}>
         <div className="scanline" />
-        {children}
+        <DeviceProvider>
+          {children}
+        </DeviceProvider>
       </body>
     </html>
   );
