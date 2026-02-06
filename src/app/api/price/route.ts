@@ -35,33 +35,34 @@ function calculateSimilarity(str1: string, str2: string): number {
 
     const w1 = n1.split(" ");
     const w2 = n2.split(" ");
+
     const common = w1.filter((w) => w2.includes(w)).length;
     const total = Math.max(w1.length, w2.length);
     return common / total;
 }
 
 /**
- * Key estándar interna:
- * nes, super-nintendo, nintendo-64, gamecube, wii, wii-u,
- * gameboy, game-boy-advance, nintendo-ds, nintendo-3ds,
- * playstation, playstation-2
+ * Soporta: NES, SNES, N64, GAMECUBE, WII, WII U, GAMEBOY, GBA, DS, 3DS, PS1, PS2
+ * + variantes típicas de PriceCharting/textos.
  */
 function normalizePlatform(input: string): string {
     const s = slugify(input);
 
     const direct: Record<string, string> = {
+        // Nintendo home
         nes: "nes",
         snes: "super-nintendo",
-        "super-nintendo": "super-nintendo",
         n64: "nintendo-64",
-        "nintendo-64": "nintendo-64",
         gamecube: "gamecube",
         gc: "gamecube",
         ngc: "gamecube",
         wii: "wii",
         "wii-u": "wii-u",
         wiiu: "wii-u",
+
+        // Nintendo handheld
         gameboy: "gameboy",
+        "game-boy": "gameboy",
         gb: "gameboy",
         gba: "game-boy-advance",
         "game-boy-advance": "game-boy-advance",
@@ -70,6 +71,8 @@ function normalizePlatform(input: string): string {
         "nintendo-ds": "nintendo-ds",
         "3ds": "nintendo-3ds",
         "nintendo-3ds": "nintendo-3ds",
+
+        // Sony
         ps1: "playstation",
         psx: "playstation",
         psone: "playstation",
@@ -87,21 +90,19 @@ function normalizePlatform(input: string): string {
             "super-nintendo-entertainment-system",
             "super-nes",
             "supernintendo",
-            "super-nintendo-system",
-            "super-nintendo-entertainment",
             "super-nintendo",
             "snes",
         ],
         "nintendo-64": ["nintendo64", "nintendo-64", "n64"],
         gamecube: ["nintendo-gamecube", "game-cube", "gamecube", "ngc", "gc"],
         wii: ["nintendo-wii", "wii"],
-        "wii-u": ["nintendo-wii-u", "wii-u", "wiiu"],
+        "wii-u": ["nintendo-wii-u", "wii-u", "wiiu", "wii u"],
         gameboy: ["game-boy", "gameboy", "nintendo-game-boy", "gb"],
-        "game-boy-advance": ["gameboy-advance", "game-boy-advance", "game-boy-adv", "gba", "gameboyadvance"],
-        "nintendo-ds": ["ds", "nintendo-ds", "nintendo-ds-lite", "nds"],
-        "nintendo-3ds": ["3ds", "nintendo-3ds", "new-nintendo-3ds"],
+        "game-boy-advance": ["gameboy-advance", "game-boy-advance", "gba", "gameboyadvance", "game boy advance"],
+        "nintendo-ds": ["ds", "nintendo-ds", "nintendo ds", "nds", "nintendo-ds-lite"],
+        "nintendo-3ds": ["3ds", "nintendo-3ds", "nintendo 3ds", "new-nintendo-3ds", "new nintendo 3ds"],
         playstation: ["ps1", "psx", "psone", "playstation-1", "sony-playstation", "playstation"],
-        "playstation-2": ["ps2", "playstation-2", "sony-ps2", "playstation2"],
+        "playstation-2": ["ps2", "playstation-2", "sony-ps2", "playstation2", "playstation 2"],
     };
 
     for (const [standard, aliases] of Object.entries(aliasGroups)) {
@@ -119,16 +120,23 @@ function parseMoney(text: string): number {
 
 /**
  * Full Price Guide: Loose, Item & Box, Complete, New
+ * Fix: normaliza NBSP para que no falle "Item & Box" aunque venga como "Item & Box". [web:196][web:201]
  */
 function extractFullPriceGuide($: cheerio.CheerioAPI) {
     const out: Record<string, number> = {};
+
+    const norm = (s: string) =>
+        (s || "")
+            .replace(/\u00A0/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
 
     $("tr").each((_, tr) => {
         const cells = $(tr).find("th,td");
         if (cells.length !== 2) return;
 
-        const key = $(cells[0]).text().replace(/\s+/g, " ").trim();
-        const val = $(cells[1]).text().replace(/\s+/g, " ").trim();
+        const key = norm($(cells[0]).text());
+        const val = norm($(cells[1]).text());
 
         if (key === "Loose" || key === "Item & Box" || key === "Complete" || key === "New") {
             out[key] = parseMoney(val);
@@ -194,7 +202,7 @@ export async function GET(req: NextRequest) {
     try {
         await delay(200 + Math.random() * 250);
 
-        // TU LÓGICA: buscar SOLO por el título
+        // BUSCADOR "bien": como el original, SOLO por title
         const searchUrl = `https://www.pricecharting.com/search-products?type=prices&q=${encodeURIComponent(
             title
         )}`;
@@ -253,14 +261,11 @@ export async function GET(req: NextRequest) {
             if (!link || !gameTitle) return;
 
             const titleScore = calculateSimilarity(title, gameTitle);
-
-            // TU LÓGICA: platform match estricto contra tu normalización
             const platformMatches = normalizePlatform(gamePlatformText) === normalizedSearchPlatform;
 
-            // TU LÓGICA: bonus 0.3 si plataforma matchea
+            // matching original
             const finalScore = titleScore + (platformMatches ? 0.3 : 0);
 
-            // TU LÓGICA: umbrales originales
             if ((titleScore >= 0.5 && platformMatches) || titleScore >= 0.85) {
                 candidates.push({
                     link: link.startsWith("http") ? link : `https://www.pricecharting.com${link}`,
@@ -332,7 +337,7 @@ export async function GET(req: NextRequest) {
         // 50% obligatorio
         const MARGIN = 0.5;
 
-        // Mapping EXACTO a tus botones:
+        // 4 botones EXACTO:
         // 1) Loose
         // 2) Item & Box
         // 3) Complete (CIB)
