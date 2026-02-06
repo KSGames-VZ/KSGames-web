@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import * as cheerio from "cheerio";
-import https from "https";
 
-const agent = new https.Agent({ rejectUnauthorized: false });
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1"
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
 ];
 
 const getRandomAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
@@ -39,11 +37,7 @@ function calculateSimilarity(str1: string, str2: string): number {
 }
 
 function normalizePlatform(platform: string): string {
-    const cleaned = platform
-        .toLowerCase()
-        .replace(/\s+/g, " ")
-        .replace(/\n/g, " ")
-        .trim();
+    const cleaned = platform.toLowerCase().replace(/\s+/g, " ").replace(/\n/g, " ").trim();
 
     const map: Record<string, string[]> = {
         playstation: ["ps1", "psx", "playstation", "playstation 1", "sony playstation"],
@@ -57,9 +51,7 @@ function normalizePlatform(platform: string): string {
     };
 
     for (const [standard, aliases] of Object.entries(map)) {
-        if (aliases.some((alias) => cleaned.includes(alias) || alias.includes(cleaned))) {
-            return standard;
-        }
+        if (aliases.some((alias) => cleaned.includes(alias) || alias.includes(cleaned))) return standard;
     }
     return cleaned;
 }
@@ -71,15 +63,12 @@ function parseMoney(text: string): number {
 }
 
 /**
- * Extrae precios de la sección "Full Price Guide"
- * que aparece como tabla: |Loose|$xx|, |Item & Box|$xx|, |Complete|$xx|, |New|$xx|
+ * Extrae los 4 precios de "Full Price Guide" (tabla clave/valor):
+ * Loose, Item & Box, Complete, New
  */
 function extractFullPriceGuide($: cheerio.CheerioAPI) {
     const out: Record<string, number> = {};
 
-    // Buscamos la tabla que contiene la fila "Full Price Guide" cerca.
-    // En la práctica: hay varias tablas; esta es una tabla de 2 columnas repetidas.
-    // Estrategia: tomar todas las filas <tr> que tengan exactamente 2 <td>/<th> con key/value.
     $("tr").each((_, tr) => {
         const cells = $(tr).find("th,td");
         if (cells.length !== 2) return;
@@ -87,7 +76,6 @@ function extractFullPriceGuide($: cheerio.CheerioAPI) {
         const key = $(cells[0]).text().replace(/\s+/g, " ").trim();
         const val = $(cells[1]).text().replace(/\s+/g, " ").trim();
 
-        // Nos interesan estas llaves exactas (como salen en la página en inglés)
         if (key === "Loose" || key === "Item & Box" || key === "Complete" || key === "New") {
             out[key] = parseMoney(val);
         }
@@ -101,6 +89,46 @@ function extractFullPriceGuide($: cheerio.CheerioAPI) {
     };
 }
 
+function looksBlocked(html: string) {
+    const s = (html || "").toLowerCase();
+    return (
+        s.includes("captcha") ||
+        s.includes("cloudflare") ||
+        s.includes("access denied") ||
+        s.includes("unusual traffic") ||
+        s.includes("verify you are human") ||
+        s.includes("attention required")
+    );
+}
+
+async function fetchHtml(url: string, referer?: string) {
+    const headers: Record<string, string> = {
+        "User-Agent": getRandomAgent(),
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        // IMPORTANTÍSIMO: evita brotli (br) para no tener HTML “raro” en serverless
+        "Accept-Encoding": "gzip, deflate",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Connection: "close",
+    };
+    if (referer) headers.Referer = referer;
+
+    const resp = await axios.get(url, {
+        timeout: 15000,
+        headers,
+        maxRedirects: 5,
+        validateStatus: () => true,
+    });
+
+    const data = typeof resp.data === "string" ? resp.data : "";
+    return {
+        status: resp.status,
+        contentType: resp.headers?.["content-type"] || "",
+        html: data,
+    };
+}
+
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const title = searchParams.get("title");
@@ -109,24 +137,44 @@ export async function GET(req: NextRequest) {
     if (!title) return NextResponse.json({ error: "No title" }, { status: 400 });
 
     try {
-        await delay(300 + Math.random() * 200);
+        await delay(200 + Math.random() * 250);
 
-        const searchQuery = encodeURIComponent(title);
-        const searchUrl = `https://www.pricecharting.com/search-products?type=prices&q=${searchQuery}`;
+        const searchUrl = `https://www.pricecharting.com/search-products?type=prices&q=${encodeURIComponent(
+            title
+        )}`;
 
-        const { data: searchData } = await axios.get(searchUrl, {
-            httpsAgent: agent,
-            timeout: 8000,
-            headers: {
-                "User-Agent": getRandomAgent(),
-                Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
-                Connection: "keep-alive",
-            },
-        });
+        // --- STEP 1: Search page ---
+        let search = await fetchHtml(searchUrl);
 
-        const $search = cheerio.load(searchData);
+        // Reintento simple si huele a bloqueo / rate limit
+        if ((search.status === 403 || search.status === 429 || looksBlocked(search.html)) && search.html) {
+            await delay(800 + Math.random() * 400);
+            search = await fetchHtml(searchUrl);
+        }
+
+        if (search.status !== 200 || !search.html) {
+            return NextResponse.json(
+                {
+                    error: "Search request failed",
+                    manual: true,
+                    debug: { status: search.status, contentType: search.contentType, searchUrl },
+                },
+                { status: 200 }
+            );
+        }
+
+        if (looksBlocked(search.html)) {
+            return NextResponse.json(
+                {
+                    error: "Blocked on search (anti-bot)",
+                    manual: true,
+                    debug: { status: search.status, searchUrl, preview: search.html.slice(0, 500) },
+                },
+                { status: 200 }
+            );
+        }
+
+        const $search = cheerio.load(search.html);
 
         interface Candidate {
             link: string;
@@ -137,7 +185,20 @@ export async function GET(req: NextRequest) {
 
         const candidates: Candidate[] = [];
         const normalizedSearchPlatform = normalizePlatform(platform);
+
         const rows = $search("#games_table tbody tr");
+
+        // Si esto viene vacío en Netlify: bloqueo o HTML diferente
+        if (rows.length === 0) {
+            return NextResponse.json(
+                {
+                    error: "Search results table not found (possible block or HTML change)",
+                    manual: true,
+                    debug: { searchUrl, preview: search.html.slice(0, 700) },
+                },
+                { status: 200 }
+            );
+        }
 
         rows.each((_, row) => {
             const $row = $search(row);
@@ -146,19 +207,13 @@ export async function GET(req: NextRequest) {
             const platformCell = $row.find("td").eq(2);
 
             const gameTitle = titleCell.find("a").text().trim() || titleCell.text().trim();
-            const gamePlatform = platformCell
-                .text()
-                .replace(/\s+/g, " ")
-                .replace(/\n/g, " ")
-                .trim()
-                .toLowerCase();
-
+            const gamePlatform = platformCell.text().replace(/\s+/g, " ").trim().toLowerCase();
             const link = titleCell.find("a").attr("href") || "";
+
             if (!link || !gameTitle) return;
 
             const titleScore = calculateSimilarity(title, gameTitle);
             const platformMatches = normalizePlatform(gamePlatform) === normalizedSearchPlatform;
-
             const finalScore = titleScore + (platformMatches ? 0.3 : 0);
 
             if ((titleScore >= 0.5 && platformMatches) || titleScore >= 0.85) {
@@ -174,46 +229,79 @@ export async function GET(req: NextRequest) {
         candidates.sort((a, b) => b.score - a.score);
 
         if (candidates.length === 0) {
-            return NextResponse.json({ error: "Game not found", manual: true });
+            return NextResponse.json({ error: "Game not found", manual: true }, { status: 200 });
         }
 
         const bestMatch = candidates[0];
         const gameLink = bestMatch.link;
 
-        await delay(500 + Math.random() * 300);
+        await delay(250 + Math.random() * 350);
 
-        const { data: gameData } = await axios.get(gameLink, {
-            httpsAgent: agent,
-            timeout: 8000,
-            headers: {
-                "User-Agent": getRandomAgent(),
-                Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                Referer: searchUrl,
-            },
-        });
+        // --- STEP 2: Game page ---
+        let game = await fetchHtml(gameLink, searchUrl);
 
-        const $ = cheerio.load(gameData);
+        if ((game.status === 403 || game.status === 429 || looksBlocked(game.html)) && game.html) {
+            await delay(800 + Math.random() * 400);
+            game = await fetchHtml(gameLink, searchUrl);
+        }
 
-        // ✅ Sacar los 4 precios correctos desde "Full Price Guide"
+        if (game.status !== 200 || !game.html) {
+            return NextResponse.json(
+                {
+                    error: "Game page request failed",
+                    manual: true,
+                    debug: { status: game.status, contentType: game.contentType, gameLink },
+                },
+                { status: 200 }
+            );
+        }
+
+        if (looksBlocked(game.html)) {
+            return NextResponse.json(
+                {
+                    error: "Blocked on game page (anti-bot)",
+                    manual: true,
+                    debug: { status: game.status, gameLink, preview: game.html.slice(0, 500) },
+                },
+                { status: 200 }
+            );
+        }
+
+        const $ = cheerio.load(game.html);
+
         const { marketLoose, marketItemBox, marketComplete, marketNew } = extractFullPriceGuide($);
 
-        // Si por alguna razón la sección no está, devolvemos debug rápido
         if (!marketLoose || !marketItemBox || !marketComplete || !marketNew) {
-            return NextResponse.json({
-                error: "Could not read Full Price Guide prices",
-                manual: true,
-                debug: { marketLoose, marketItemBox, marketComplete, marketNew, gameLink },
-            });
+            return NextResponse.json(
+                {
+                    error: "Could not read Full Price Guide prices (HTML changed or partial load)",
+                    manual: true,
+                    debug: {
+                        gameLink,
+                        marketLoose,
+                        marketItemBox,
+                        marketComplete,
+                        marketNew,
+                        // Ayuda para ver si el texto existe
+                        hasLoose: game.html.includes("Loose"),
+                        hasItemBox: game.html.includes("Item & Box"),
+                        hasComplete: game.html.includes("Complete"),
+                        hasNew: game.html.includes("New"),
+                        preview: game.html.slice(0, 700),
+                    },
+                },
+                { status: 200 }
+            );
         }
 
         // 50% obligatorio
         const MARGIN = 0.5;
 
         const finalPrices = {
-            loose: Math.round(marketLoose * MARGIN),           // Loose Price
-            complete: Math.round(marketItemBox * MARGIN),      // Item & Box (Juego + caja)
-            cib: Math.round(marketComplete * MARGIN),          // Complete Price (CIB)
-            new: Math.round(marketNew * MARGIN),               // New Price (Sellado)
+            loose: Math.round(marketLoose * MARGIN),
+            complete: Math.round(marketItemBox * MARGIN),
+            cib: Math.round(marketComplete * MARGIN),
+            new: Math.round(marketNew * MARGIN),
             matchedTitle: bestMatch.title,
             matchedPlatform: bestMatch.platform,
             confidence: bestMatch.score,
@@ -223,19 +311,18 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(finalPrices, {
             status: 200,
             headers: {
-                // s-maxage=604800: Cache en el servidor (Netlify CDN) por 7 días
-                // stale-while-revalidate: Sirve el precio viejo mientras busca el nuevo en segundo plano
-                "Cache-Control": "public, s-maxage=604800, stale-while-revalidate=86400",
+                "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
             },
         });
     } catch (error: any) {
-        const isTimeout = error.code === 'ECONNABORTED' || error.message.includes('timeout');
-
+        const isTimeout = error?.code === "ECONNABORTED" || String(error?.message || "").includes("timeout");
         return NextResponse.json(
             {
-                error: isTimeout ? "El servidor de precios está tardando demasiado. Intenta nuevamente." : "Scraping failed",
+                error: isTimeout
+                    ? "Timeout consultando PriceCharting (posible bloqueo o latencia)."
+                    : "Scraping failed",
                 manual: true,
-                details: error?.message || String(error)
+                details: error?.message || String(error),
             },
             { status: isTimeout ? 504 : 500 }
         );
