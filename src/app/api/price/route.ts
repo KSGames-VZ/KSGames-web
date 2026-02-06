@@ -13,103 +13,149 @@ const USER_AGENTS = [
 
 const getRandomAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
-function normalizeText(s: string): string {
-    return (s || "")
-        .toLowerCase()
-        .replace(/[:\-–—]/g, " ")
-        .replace(/[_/\\|()[\]{}]/g, " ")
-        .replace(/\s+/g, " ")
-        .replace(/['"]/g, "")
-        .trim();
-}
-
-function slugify(s: string): string {
-    return normalizeText(s).replace(/\s+/g, "-");
-}
-
 function calculateSimilarity(str1: string, str2: string): number {
-    const n1 = normalizeText(str1);
-    const n2 = normalizeText(str2);
-    if (!n1 || !n2) return 0;
-    if (n1 === n2) return 1.0;
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+    if (s1 === s2) return 1.0;
 
-    const w1 = n1.split(" ");
-    const w2 = n2.split(" ");
+    const normalize = (s: string) =>
+        s
+            .replace(/[:\-–—]/g, " ")
+            .replace(/\s+/g, " ")
+            .replace(/['"]/g, "")
+            .trim();
 
-    const common = w1.filter((w) => w2.includes(w)).length;
-    const total = Math.max(w1.length, w2.length);
-    return common / total;
+    const n1 = normalize(s1);
+    const n2 = normalize(s2);
+    if (n1 === n2) return 0.95;
+
+    const words1 = n1.split(" ");
+    const words2 = n2.split(" ");
+    const commonWords = words1.filter((w) => words2.includes(w)).length;
+    const totalWords = Math.max(words1.length, words2.length);
+    return commonWords / totalWords;
 }
 
-/**
- * Soporta: NES, SNES, N64, GAMECUBE, WII, WII U, GAMEBOY, GBA, DS, 3DS, PS1, PS2
- * + variantes típicas de PriceCharting/textos.
- */
-function normalizePlatform(input: string): string {
-    const s = slugify(input);
+function normalizePlatform(platform: string): string {
+    const cleaned = platform.toLowerCase().replace(/\s+/g, " ").replace(/\n/g, " ").trim();
 
-    const direct: Record<string, string> = {
+    const map: Record<string, string[]> = {
         // Nintendo home
-        nes: "nes",
-        snes: "super-nintendo",
-        n64: "nintendo-64",
-        gamecube: "gamecube",
-        gc: "gamecube",
-        ngc: "gamecube",
-        wii: "wii",
-        "wii-u": "wii-u",
-        wiiu: "wii-u",
+        nes: [
+            "nes",
+            "nintendo-entertainment-system",
+            "nintendo-nes",
+            "nintendo-entertainment",
+            "famicom",
+            "family-computer",
+            "fc",
+        ],
+        "super-nintendo": [
+            "snes",
+            "super-nintendo",
+            "super-nes",
+            "super-nintendo-entertainment-system",
+            "super-nintendo-entertainment",
+            "supernintendo",
+            "super-famicom",
+            "superfamicom",
+            "sfc",
+        ],
+        "nintendo-64": [
+            "n64",
+            "nintendo-64",
+            "nintendo64",
+            "nintendo-ultra-64",
+            "ultra-64",
+            "nus",
+        ],
+        gamecube: [
+            "gamecube",
+            "game-cube",
+            "nintendo-gamecube",
+            "ngc",
+            "gc",
+            "dol-001", // a veces aparece en listados raros
+            "dol",
+        ],
+        wii: [
+            "wii",
+            "nintendo-wii",
+            "rvL",        // muy raro, pero aparece en referencias
+            "rvl",
+        ],
+        "wii-u": [
+            "wii-u",
+            "wiiu",
+            "wii-u-console",
+            "wii u",
+            "nintendo-wii-u",
+            "wup",
+        ],
 
         // Nintendo handheld
-        gameboy: "gameboy",
-        "game-boy": "gameboy",
-        gb: "gameboy",
-        gba: "game-boy-advance",
-        "game-boy-advance": "game-boy-advance",
-        ds: "nintendo-ds",
-        nds: "nintendo-ds",
-        "nintendo-ds": "nintendo-ds",
-        "3ds": "nintendo-3ds",
-        "nintendo-3ds": "nintendo-3ds",
+        gameboy: [
+            "gameboy",
+            "game-boy",
+            "nintendo-gameboy",
+            "nintendo-game-boy",
+            "gb",
+            "dmg", // modelo/origen común en abreviaciones
+        ],
+        "game-boy-advance": [
+            "gba",
+            "game-boy-advance",
+            "gameboy-advance",
+            "game boy advance",
+            "gameboyadvance",
+            "agb", // a veces usado como abreviación
+        ],
+        "nintendo-ds": [
+            "ds",
+            "nds",
+            "nintendo-ds",
+            "nintendo ds",
+            "nintendo-ds-lite",
+            "ds-lite",
+            "dsl",
+            "dsi",
+        ],
+        "nintendo-3ds": [
+            "3ds",
+            "nintendo-3ds",
+            "nintendo 3ds",
+            "new-nintendo-3ds",
+            "new nintendo 3ds",
+            "n3ds",
+            "ctr",
+        ],
 
         // Sony
-        ps1: "playstation",
-        psx: "playstation",
-        psone: "playstation",
-        playstation: "playstation",
-        ps2: "playstation-2",
-        "playstation-2": "playstation-2",
-        playstation2: "playstation-2",
-    };
-
-    if (direct[s]) return direct[s];
-
-    const aliasGroups: Record<string, string[]> = {
-        nes: ["nintendo-entertainment-system", "nintendo-nes", "famicom"],
-        "super-nintendo": [
-            "super-nintendo-entertainment-system",
-            "super-nes",
-            "supernintendo",
-            "super-nintendo",
-            "snes",
+        playstation: [
+            "ps1",
+            "psx",
+            "psone",
+            "ps-one",
+            "playstation",
+            "playstation-1",
+            "playstation one",
+            "sony-playstation",
+            "sce-playstation",
         ],
-        "nintendo-64": ["nintendo64", "nintendo-64", "n64"],
-        gamecube: ["nintendo-gamecube", "game-cube", "gamecube", "ngc", "gc"],
-        wii: ["nintendo-wii", "wii"],
-        "wii-u": ["nintendo-wii-u", "wii-u", "wiiu", "wii u"],
-        gameboy: ["game-boy", "gameboy", "nintendo-game-boy", "gb"],
-        "game-boy-advance": ["gameboy-advance", "game-boy-advance", "gba", "gameboyadvance", "game boy advance"],
-        "nintendo-ds": ["ds", "nintendo-ds", "nintendo ds", "nds", "nintendo-ds-lite"],
-        "nintendo-3ds": ["3ds", "nintendo-3ds", "nintendo 3ds", "new-nintendo-3ds", "new nintendo 3ds"],
-        playstation: ["ps1", "psx", "psone", "playstation-1", "sony-playstation", "playstation"],
-        "playstation-2": ["ps2", "playstation-2", "sony-ps2", "playstation2", "playstation 2"],
+        "playstation-2": [
+            "ps2",
+            "playstation-2",
+            "playstation2",
+            "playstation 2",
+            "sony-ps2",
+            "sce-ps2",
+        ],
     };
 
-    for (const [standard, aliases] of Object.entries(aliasGroups)) {
-        if (aliases.some((a) => s === a || s.includes(a) || a.includes(s))) return standard;
+    for (const [standard, aliases] of Object.entries(map)) {
+        if (aliases.some((alias) => cleaned.includes(alias) || alias.includes(cleaned))) return standard;
     }
-
-    return s;
+    return cleaned;
 }
 
 function parseMoney(text: string): number {
@@ -119,24 +165,18 @@ function parseMoney(text: string): number {
 }
 
 /**
- * Full Price Guide: Loose, Item & Box, Complete, New
- * Fix: normaliza NBSP para que no falle "Item & Box" aunque venga como "Item & Box". [web:196][web:201]
+ * Extrae los 4 precios de "Full Price Guide" (tabla clave/valor):
+ * Loose, Item & Box, Complete, New
  */
 function extractFullPriceGuide($: cheerio.CheerioAPI) {
     const out: Record<string, number> = {};
-
-    const norm = (s: string) =>
-        (s || "")
-            .replace(/\u00A0/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
 
     $("tr").each((_, tr) => {
         const cells = $(tr).find("th,td");
         if (cells.length !== 2) return;
 
-        const key = norm($(cells[0]).text());
-        const val = norm($(cells[1]).text());
+        const key = $(cells[0]).text().replace(/\s+/g, " ").trim();
+        const val = $(cells[1]).text().replace(/\s+/g, " ").trim();
 
         if (key === "Loose" || key === "Item & Box" || key === "Complete" || key === "New") {
             out[key] = parseMoney(val);
@@ -168,6 +208,7 @@ async function fetchHtml(url: string, referer?: string) {
         "User-Agent": getRandomAgent(),
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        // IMPORTANTÍSIMO: evita brotli (br) para no tener HTML “raro” en serverless
         "Accept-Encoding": "gzip, deflate",
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
@@ -192,24 +233,22 @@ async function fetchHtml(url: string, referer?: string) {
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
-    const title = searchParams.get("title") || "";
-    const platformRaw = searchParams.get("platform") || "";
+    const title = searchParams.get("title");
+    const platform = searchParams.get("platform")?.toLowerCase() || "";
 
     if (!title) return NextResponse.json({ error: "No title" }, { status: 400 });
-
-    const normalizedSearchPlatform = normalizePlatform(platformRaw);
 
     try {
         await delay(200 + Math.random() * 250);
 
-        // BUSCADOR "bien": como el original, SOLO por title
         const searchUrl = `https://www.pricecharting.com/search-products?type=prices&q=${encodeURIComponent(
             title
         )}`;
 
-        // --- STEP 1: Search ---
+        // --- STEP 1: Search page ---
         let search = await fetchHtml(searchUrl);
 
+        // Reintento simple si huele a bloqueo / rate limit
         if ((search.status === 403 || search.status === 429 || looksBlocked(search.html)) && search.html) {
             await delay(800 + Math.random() * 400);
             search = await fetchHtml(searchUrl);
@@ -217,14 +256,22 @@ export async function GET(req: NextRequest) {
 
         if (search.status !== 200 || !search.html) {
             return NextResponse.json(
-                { error: "Search request failed", manual: true, debug: { status: search.status, searchUrl } },
+                {
+                    error: "Search request failed",
+                    manual: true,
+                    debug: { status: search.status, contentType: search.contentType, searchUrl },
+                },
                 { status: 200 }
             );
         }
 
         if (looksBlocked(search.html)) {
             return NextResponse.json(
-                { error: "Blocked on search (anti-bot)", manual: true, debug: { status: search.status, preview: search.html.slice(0, 500) } },
+                {
+                    error: "Blocked on search (anti-bot)",
+                    manual: true,
+                    debug: { status: search.status, searchUrl, preview: search.html.slice(0, 500) },
+                },
                 { status: 200 }
             );
         }
@@ -239,11 +286,18 @@ export async function GET(req: NextRequest) {
         }
 
         const candidates: Candidate[] = [];
+        const normalizedSearchPlatform = normalizePlatform(platform);
+
         const rows = $search("#games_table tbody tr");
 
+        // Si esto viene vacío en Netlify: bloqueo o HTML diferente
         if (rows.length === 0) {
             return NextResponse.json(
-                { error: "Search results table not found", manual: true, debug: { searchUrl, preview: search.html.slice(0, 700) } },
+                {
+                    error: "Search results table not found (possible block or HTML change)",
+                    manual: true,
+                    debug: { searchUrl, preview: search.html.slice(0, 700) },
+                },
                 { status: 200 }
             );
         }
@@ -255,22 +309,20 @@ export async function GET(req: NextRequest) {
             const platformCell = $row.find("td").eq(2);
 
             const gameTitle = titleCell.find("a").text().trim() || titleCell.text().trim();
-            const gamePlatformText = platformCell.text().replace(/\s+/g, " ").trim().toLowerCase();
+            const gamePlatform = platformCell.text().replace(/\s+/g, " ").trim().toLowerCase();
             const link = titleCell.find("a").attr("href") || "";
 
             if (!link || !gameTitle) return;
 
             const titleScore = calculateSimilarity(title, gameTitle);
-            const platformMatches = normalizePlatform(gamePlatformText) === normalizedSearchPlatform;
-
-            // matching original
+            const platformMatches = normalizePlatform(gamePlatform) === normalizedSearchPlatform;
             const finalScore = titleScore + (platformMatches ? 0.3 : 0);
 
             if ((titleScore >= 0.5 && platformMatches) || titleScore >= 0.85) {
                 candidates.push({
                     link: link.startsWith("http") ? link : `https://www.pricecharting.com${link}`,
                     title: gameTitle,
-                    platform: gamePlatformText,
+                    platform: gamePlatform,
                     score: finalScore,
                 });
             }
@@ -297,25 +349,34 @@ export async function GET(req: NextRequest) {
 
         if (game.status !== 200 || !game.html) {
             return NextResponse.json(
-                { error: "Game page request failed", manual: true, debug: { status: game.status, gameLink } },
+                {
+                    error: "Game page request failed",
+                    manual: true,
+                    debug: { status: game.status, contentType: game.contentType, gameLink },
+                },
                 { status: 200 }
             );
         }
 
         if (looksBlocked(game.html)) {
             return NextResponse.json(
-                { error: "Blocked on game page (anti-bot)", manual: true, debug: { status: game.status, gameLink, preview: game.html.slice(0, 500) } },
+                {
+                    error: "Blocked on game page (anti-bot)",
+                    manual: true,
+                    debug: { status: game.status, gameLink, preview: game.html.slice(0, 500) },
+                },
                 { status: 200 }
             );
         }
 
         const $ = cheerio.load(game.html);
+
         const { marketLoose, marketItemBox, marketComplete, marketNew } = extractFullPriceGuide($);
 
         if (!marketLoose || !marketItemBox || !marketComplete || !marketNew) {
             return NextResponse.json(
                 {
-                    error: "Could not read Full Price Guide prices",
+                    error: "Could not read Full Price Guide prices (HTML changed or partial load)",
                     manual: true,
                     debug: {
                         gameLink,
@@ -323,6 +384,7 @@ export async function GET(req: NextRequest) {
                         marketItemBox,
                         marketComplete,
                         marketNew,
+                        // Ayuda para ver si el texto existe
                         hasLoose: game.html.includes("Loose"),
                         hasItemBox: game.html.includes("Item & Box"),
                         hasComplete: game.html.includes("Complete"),
@@ -337,38 +399,35 @@ export async function GET(req: NextRequest) {
         // 50% obligatorio
         const MARGIN = 0.5;
 
-        // 4 botones EXACTO:
-        // 1) Loose
-        // 2) Item & Box
-        // 3) Complete (CIB)
-        // 4) New
         const finalPrices = {
-            loose: Math.round(marketLoose * MARGIN),
-            itemBox: Math.round(marketItemBox * MARGIN),
-            cib: Math.round(marketComplete * MARGIN),
-            new: Math.round(marketNew * MARGIN),
+            loose: Math.round(marketLoose * MARGIN),           // Loose Price
+            complete: Math.round(marketItemBox * MARGIN),      // Item & Box
+            cib: Math.round(marketComplete * MARGIN),          // CIB
+            new: Math.round(marketNew * MARGIN),               // New
             matchedTitle: bestMatch.title,
             matchedPlatform: bestMatch.platform,
             confidence: bestMatch.score,
             lastUpdated: new Date().toISOString(),
         };
 
+        // REEMPLAZA EL RETURN FINAL POR ESTO:
         return NextResponse.json(finalPrices, {
             status: 200,
             headers: {
+                // Éstos headers obligan a Netlify a NO guardar cache y buscar precios nuevos siempre
                 "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-                Pragma: "no-cache",
-                Expires: "0",
-                "Surrogate-Control": "no-store",
-            },
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "Surrogate-Control": "no-store"
+            }
         });
     } catch (error: any) {
-        const isTimeout =
-            error?.code === "ECONNABORTED" || String(error?.message || "").toLowerCase().includes("timeout");
-
+        const isTimeout = error?.code === "ECONNABORTED" || String(error?.message || "").includes("timeout");
         return NextResponse.json(
             {
-                error: isTimeout ? "Timeout consultando PriceCharting." : "Scraping failed",
+                error: isTimeout
+                    ? "Timeout consultando PriceCharting (posible bloqueo o latencia)."
+                    : "Scraping failed",
                 manual: true,
                 details: error?.message || String(error),
             },
