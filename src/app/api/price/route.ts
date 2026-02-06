@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 
 const USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -11,12 +13,15 @@ const USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
 ];
 
+
 const getRandomAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
 
 function calculateSimilarity(str1: string, str2: string): number {
     const s1 = str1.toLowerCase().trim();
     const s2 = str2.toLowerCase().trim();
     if (s1 === s2) return 1.0;
+
 
     const normalize = (s: string) =>
         s
@@ -25,9 +30,11 @@ function calculateSimilarity(str1: string, str2: string): number {
             .replace(/['"]/g, "")
             .trim();
 
+
     const n1 = normalize(s1);
     const n2 = normalize(s2);
     if (n1 === n2) return 0.95;
+
 
     const words1 = n1.split(" ");
     const words2 = n2.split(" ");
@@ -36,121 +43,28 @@ function calculateSimilarity(str1: string, str2: string): number {
     return commonWords / totalWords;
 }
 
+
 function normalizePlatform(platform: string): string {
-    const cleaned = platform.toLowerCase().replace(/\s+/g, " ").replace(/\n/g, " ").trim();
+    const cleaned = platform.toLowerCase().replace(/\s+/g, "-").replace(/\n/g, "-").trim();
+
 
     const map: Record<string, string[]> = {
-        // Nintendo home
-        nes: [
-            "nes",
-            "nintendo-entertainment-system",
-            "nintendo-nes",
-            "nintendo-entertainment",
-            "famicom",
-            "family-computer",
-            "fc",
-        ],
-        "super-nintendo": [
-            "snes",
-            "super-nintendo",
-            "super-nes",
-            "super-nintendo-entertainment-system",
-            "super-nintendo-entertainment",
-            "supernintendo",
-            "super-famicom",
-            "superfamicom",
-            "sfc",
-        ],
-        "nintendo-64": [
-            "n64",
-            "nintendo-64",
-            "nintendo64",
-            "nintendo-ultra-64",
-            "ultra-64",
-            "nus",
-        ],
-        gamecube: [
-            "gamecube",
-            "game-cube",
-            "nintendo-gamecube",
-            "ngc",
-            "gc",
-            "dol-001", // a veces aparece en listados raros
-            "dol",
-        ],
-        wii: [
-            "wii",
-            "nintendo-wii",
-            "rvL",        // muy raro, pero aparece en referencias
-            "rvl",
-        ],
-        "wii-u": [
-            "wii-u",
-            "wiiu",
-            "wii-u-console",
-            "wii u",
-            "nintendo-wii-u",
-            "wup",
-        ],
-
-        // Nintendo handheld
-        gameboy: [
-            "gameboy",
-            "game-boy",
-            "nintendo-gameboy",
-            "nintendo-game-boy",
-            "gb",
-            "dmg", // modelo/origen común en abreviaciones
-        ],
-        "game-boy-advance": [
-            "gba",
-            "game-boy-advance",
-            "gameboy-advance",
-            "game boy advance",
-            "gameboyadvance",
-            "agb", // a veces usado como abreviación
-        ],
-        "nintendo-ds": [
-            "ds",
-            "nds",
-            "nintendo-ds",
-            "nintendo ds",
-            "nintendo-ds-lite",
-            "ds-lite",
-            "dsl",
-            "dsi",
-        ],
-        "nintendo-3ds": [
-            "3ds",
-            "nintendo-3ds",
-            "nintendo 3ds",
-            "new-nintendo-3ds",
-            "new nintendo 3ds",
-            "n3ds",
-            "ctr",
-        ],
-
-        // Sony
-        playstation: [
-            "ps1",
-            "psx",
-            "psone",
-            "ps-one",
-            "playstation",
-            "playstation-1",
-            "playstation one",
-            "sony-playstation",
-            "sce-playstation",
-        ],
-        "playstation-2": [
-            "ps2",
-            "playstation-2",
-            "playstation2",
-            "playstation 2",
-            "sony-ps2",
-            "sce-ps2",
-        ],
+        "playstation": ["ps1", "psx", "playstation", "playstation-1"],
+        "playstation-2": ["ps2", "playstation-2"],
+        "playstation-3": ["ps3", "playstation-3"],
+        "nintendo-64": ["n64", "nintendo-64", "nintendo64"],
+        "gamecube": ["gc", "gamecube", "game-cube", "ngc"],
+        "super-nintendo": ["snes", "super-nintendo", "super-nes"],
+        "nes": ["nes", "nintendo-entertainment-system"],
+        "game-boy": ["gb", "gameboy", "game-boy"],
+        "gameboy-advance": ["gba", "game-boy-advance", "gameboy-advance"],
+        "nintendo-ds": ["ds", "nintendo-ds", "nds"],
+        "nintendo-3ds": ["3ds", "nintendo-3ds"],
+        "wii": ["wii", "nintendo-wii"],
+        "wii-u": ["wiiu", "wii-u", "nintendo-wii-u"],
+        "xbox": ["xbox", "microsoft-xbox"],
     };
+
 
     for (const [standard, aliases] of Object.entries(map)) {
         if (aliases.some((alias) => cleaned.includes(alias) || alias.includes(cleaned))) return standard;
@@ -158,11 +72,13 @@ function normalizePlatform(platform: string): string {
     return cleaned;
 }
 
+
 function parseMoney(text: string): number {
     const cleaned = (text || "").replace(/[^0-9.]/g, "");
     const n = parseFloat(cleaned);
     return Number.isFinite(n) ? n : 0;
 }
+
 
 /**
  * Extrae los 4 precios de "Full Price Guide" (tabla clave/valor):
@@ -171,17 +87,21 @@ function parseMoney(text: string): number {
 function extractFullPriceGuide($: cheerio.CheerioAPI) {
     const out: Record<string, number> = {};
 
+
     $("tr").each((_, tr) => {
         const cells = $(tr).find("th,td");
         if (cells.length !== 2) return;
 
+
         const key = $(cells[0]).text().replace(/\s+/g, " ").trim();
         const val = $(cells[1]).text().replace(/\s+/g, " ").trim();
+
 
         if (key === "Loose" || key === "Item & Box" || key === "Complete" || key === "New") {
             out[key] = parseMoney(val);
         }
     });
+
 
     return {
         marketLoose: out["Loose"] || 0,
@@ -190,6 +110,7 @@ function extractFullPriceGuide($: cheerio.CheerioAPI) {
         marketNew: out["New"] || 0,
     };
 }
+
 
 function looksBlocked(html: string) {
     const s = (html || "").toLowerCase();
@@ -203,12 +124,13 @@ function looksBlocked(html: string) {
     );
 }
 
+
 async function fetchHtml(url: string, referer?: string) {
     const headers: Record<string, string> = {
         "User-Agent": getRandomAgent(),
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
-        // IMPORTANTÍSIMO: evita brotli (br) para no tener HTML “raro” en serverless
+        // IMPORTANTÍSIMO: evita brotli (br) para no tener HTML "raro" en serverless
         "Accept-Encoding": "gzip, deflate",
         "Cache-Control": "no-cache",
         Pragma: "no-cache",
@@ -216,12 +138,14 @@ async function fetchHtml(url: string, referer?: string) {
     };
     if (referer) headers.Referer = referer;
 
+
     const resp = await axios.get(url, {
         timeout: 15000,
         headers,
         maxRedirects: 5,
         validateStatus: () => true,
     });
+
 
     const data = typeof resp.data === "string" ? resp.data : "";
     return {
@@ -231,28 +155,35 @@ async function fetchHtml(url: string, referer?: string) {
     };
 }
 
+
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const title = searchParams.get("title");
     const platform = searchParams.get("platform")?.toLowerCase() || "";
 
+
     if (!title) return NextResponse.json({ error: "No title" }, { status: 400 });
+
 
     try {
         await delay(200 + Math.random() * 250);
+
 
         const searchUrl = `https://www.pricecharting.com/search-products?type=prices&q=${encodeURIComponent(
             title
         )}`;
 
+
         // --- STEP 1: Search page ---
         let search = await fetchHtml(searchUrl);
+
 
         // Reintento simple si huele a bloqueo / rate limit
         if ((search.status === 403 || search.status === 429 || looksBlocked(search.html)) && search.html) {
             await delay(800 + Math.random() * 400);
             search = await fetchHtml(searchUrl);
         }
+
 
         if (search.status !== 200 || !search.html) {
             return NextResponse.json(
@@ -265,6 +196,7 @@ export async function GET(req: NextRequest) {
             );
         }
 
+
         if (looksBlocked(search.html)) {
             return NextResponse.json(
                 {
@@ -276,7 +208,9 @@ export async function GET(req: NextRequest) {
             );
         }
 
+
         const $search = cheerio.load(search.html);
+
 
         interface Candidate {
             link: string;
@@ -285,10 +219,13 @@ export async function GET(req: NextRequest) {
             score: number;
         }
 
+
         const candidates: Candidate[] = [];
         const normalizedSearchPlatform = normalizePlatform(platform);
 
+
         const rows = $search("#games_table tbody tr");
+
 
         // Si esto viene vacío en Netlify: bloqueo o HTML diferente
         if (rows.length === 0) {
@@ -302,21 +239,27 @@ export async function GET(req: NextRequest) {
             );
         }
 
+
         rows.each((_, row) => {
             const $row = $search(row);
 
+
             const titleCell = $row.find("td").eq(1);
             const platformCell = $row.find("td").eq(2);
+
 
             const gameTitle = titleCell.find("a").text().trim() || titleCell.text().trim();
             const gamePlatform = platformCell.text().replace(/\s+/g, " ").trim().toLowerCase();
             const link = titleCell.find("a").attr("href") || "";
 
+
             if (!link || !gameTitle) return;
+
 
             const titleScore = calculateSimilarity(title, gameTitle);
             const platformMatches = normalizePlatform(gamePlatform) === normalizedSearchPlatform;
             const finalScore = titleScore + (platformMatches ? 0.3 : 0);
+
 
             if ((titleScore >= 0.5 && platformMatches) || titleScore >= 0.85) {
                 candidates.push({
@@ -328,24 +271,31 @@ export async function GET(req: NextRequest) {
             }
         });
 
+
         candidates.sort((a, b) => b.score - a.score);
+
 
         if (candidates.length === 0) {
             return NextResponse.json({ error: "Game not found", manual: true }, { status: 200 });
         }
 
+
         const bestMatch = candidates[0];
         const gameLink = bestMatch.link;
 
+
         await delay(250 + Math.random() * 350);
+
 
         // --- STEP 2: Game page ---
         let game = await fetchHtml(gameLink, searchUrl);
+
 
         if ((game.status === 403 || game.status === 429 || looksBlocked(game.html)) && game.html) {
             await delay(800 + Math.random() * 400);
             game = await fetchHtml(gameLink, searchUrl);
         }
+
 
         if (game.status !== 200 || !game.html) {
             return NextResponse.json(
@@ -358,6 +308,7 @@ export async function GET(req: NextRequest) {
             );
         }
 
+
         if (looksBlocked(game.html)) {
             return NextResponse.json(
                 {
@@ -369,9 +320,12 @@ export async function GET(req: NextRequest) {
             );
         }
 
+
         const $ = cheerio.load(game.html);
 
+
         const { marketLoose, marketItemBox, marketComplete, marketNew } = extractFullPriceGuide($);
+
 
         if (!marketLoose || !marketItemBox || !marketComplete || !marketNew) {
             return NextResponse.json(
@@ -396,8 +350,10 @@ export async function GET(req: NextRequest) {
             );
         }
 
+
         // 50% obligatorio
         const MARGIN = 0.5;
+
 
         const finalPrices = {
             loose: Math.round(marketLoose * MARGIN),           // Loose Price
@@ -410,7 +366,7 @@ export async function GET(req: NextRequest) {
             lastUpdated: new Date().toISOString(),
         };
 
-        // REEMPLAZA EL RETURN FINAL POR ESTO:
+
         return NextResponse.json(finalPrices, {
             status: 200,
             headers: {
