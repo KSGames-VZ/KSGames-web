@@ -298,21 +298,26 @@ export async function GET(req: NextRequest) {
         const MARGIN = 0.5;
 
         const finalPrices = {
-            loose: Math.round(marketLoose * MARGIN),
-            complete: Math.round(marketItemBox * MARGIN),
-            cib: Math.round(marketComplete * MARGIN),
-            new: Math.round(marketNew * MARGIN),
+            loose: Math.round(marketLoose * MARGIN),           // Loose Price
+            complete: Math.round(marketItemBox * MARGIN),      // Item & Box
+            cib: Math.round(marketComplete * MARGIN),          // CIB
+            new: Math.round(marketNew * MARGIN),               // New
             matchedTitle: bestMatch.title,
             matchedPlatform: bestMatch.platform,
             confidence: bestMatch.score,
             lastUpdated: new Date().toISOString(),
         };
 
+        // REEMPLAZA EL RETURN FINAL POR ESTO:
         return NextResponse.json(finalPrices, {
             status: 200,
             headers: {
-                "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
-            },
+                // Éstos headers obligan a Netlify a NO guardar cache y buscar precios nuevos siempre
+                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "Surrogate-Control": "no-store"
+            }
         });
     } catch (error: any) {
         const isTimeout = error?.code === "ECONNABORTED" || String(error?.message || "").includes("timeout");
