@@ -8,7 +8,7 @@ const TWITCH_AUTH_URL = 'https://id.twitch.tv/oauth2/token';
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
 
-// Supported Platform IDs (for security and filtering)
+// Supported Platform IDs
 const SUPPORTED_PLATFORMS = [
     18, // NES
     19, // SNES
@@ -30,11 +30,12 @@ async function getAccessToken() {
         return cachedToken;
     }
 
-    const clientId = process.env.NEXT_PUBLIC_IGDB_CLIENT_ID;
+    // CORRECCIÓN: Se eliminó "NEXT_PUBLIC_" para que coincida con Netlify
+    const clientId = process.env.IGDB_CLIENT_ID;
     const clientSecret = process.env.IGDB_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-        throw new Error('IGDB Credentials missing in .env.local');
+        throw new Error('IGDB Credentials missing in Netlify Environment Variables');
     }
 
     try {
@@ -69,15 +70,15 @@ export async function POST(request: Request) {
         }
 
         const token = await getAccessToken();
-        const clientId = process.env.NEXT_PUBLIC_IGDB_CLIENT_ID!;
+        
+        // CORRECCIÓN: Se eliminó "NEXT_PUBLIC_" aquí también
+        const clientId = process.env.IGDB_CLIENT_ID!;
 
         let whereClause = `name ~ *"${query}"* & cover != null`;
 
-        // Strict Platform Filtering
         if (platformId) {
             whereClause += ` & platforms = (${platformId})`;
         } else {
-            // If no specific platform, restrict to ANY of our supported ones
             whereClause += ` & platforms = (${SUPPORTED_PLATFORMS.join(',')})`;
         }
 
