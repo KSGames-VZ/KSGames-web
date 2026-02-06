@@ -60,10 +60,10 @@ export default function Header() {
                 </button>
             </div>
 
-            {/* Mobile Menu Drawer */}
+            {/* Mobile Menu Dropdown */}
             {isMenuOpen && (
-                <div className="md:hidden fixed inset-0 top-20 bg-black/98 z-40 animate-in fade-in slide-in-from-top-4 duration-300">
-                    <nav className="flex flex-col items-center justify-center h-full gap-8 p-4">
+                <div className="md:hidden absolute top-20 left-0 w-full bg-slate-900/95 backdrop-blur-xl border-b border-white/10 shadow-2xl animate-in slide-in-from-top-2 fade-in duration-200">
+                    <nav className="flex flex-col p-4 space-y-2">
                         {navLinks.map((link) => (
                             <a
                                 key={link.name}
@@ -71,7 +71,7 @@ export default function Header() {
                                 onClick={() => setIsMenuOpen(false)}
                                 target={link.external ? "_blank" : undefined}
                                 rel={link.external ? "noopener noreferrer" : undefined}
-                                className="text-2xl font-black text-slate-200 hover:text-yellow-400 transition-colors uppercase tracking-widest"
+                                className="block w-full p-4 rounded-xl text-lg font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-all uppercase tracking-wider border border-transparent hover:border-white/5"
                             >
                                 {link.name}
                             </a>
