@@ -107,22 +107,51 @@ export default function Home() {
 
               {/* Step 2: Search */}
               <div className="min-h-[400px] relative transition-all duration-500">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold shadow-lg transition-colors ${selectedConsole ? 'bg-slate-800 border-slate-700 text-yellow-400' : 'bg-slate-900 border-slate-800 text-slate-600'}`}>2</div>
-                  <h3 className={`text-2xl font-bold transition-colors ${selectedConsole ? 'text-white' : 'text-slate-600'}`}>
-                    Busca el Título {selectedConsole ? '' : '(Bloqueado)'}
-                  </h3>
-                </div>
+                <div className="flex flex-col lg:flex-row gap-12">
+                  {/* Left Column: Advisory Note */}
+                  <div className="lg:w-1/3 space-y-6">
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold shadow-lg transition-colors ${selectedConsole ? 'bg-slate-800 border-slate-700 text-yellow-400' : 'bg-slate-900 border-slate-800 text-slate-600'}`}>2</div>
+                      <h3 className={`text-2xl font-bold transition-colors ${selectedConsole ? 'text-white' : 'text-slate-600'}`}>
+                        Busca el Título {selectedConsole ? '' : '(Bloqueado)'}
+                      </h3>
+                    </div>
 
-                {selectedConsole ? (
-                  <div className="animate-fade-in">
-                    <GameSearch platformId={selectedConsole} onSelectGame={handleGameSelect} />
+                    <div className="p-6 bg-yellow-400/5 border border-yellow-400/10 rounded-2xl space-y-4">
+                      <div className="flex items-center gap-2 text-yellow-400">
+                        <ShoppingBag className="w-5 h-5" />
+                        <span className="text-xs font-black uppercase tracking-widest">¿No ves tu juego?</span>
+                      </div>
+                      <p className="text-slate-400 text-sm leading-relaxed">
+                        Si tu título no aparece en la lista o no visualizas un precio aproximado, <strong>contáctanos de inmediato.</strong>
+                      </p>
+                      <p className="text-slate-400 text-sm leading-relaxed">
+                        Nuestro equipo está listo para brindarte una valoración personalizada para cualquier juego o consola.
+                      </p>
+                      <a
+                        href="https://api.whatsapp.com/send/?phone=584242580291&text=Hola%2C%20no%20encuentro%20un%20juego%20en%20el%20cotizador%20y%20me%20gustar%C3%ADa%20una%20valoraci%C3%B3n."
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full bg-green-500/20 hover:bg-green-500/30 text-green-400 py-3 rounded-xl border border-green-500/20 font-bold text-sm transition-all hover:scale-[1.02] active:scale-95 uppercase tracking-wider"
+                      >
+                        Contactar vía WhatsApp
+                      </a>
+                    </div>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-48 sm:h-64 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/50 text-slate-500">
-                    <p>Por favor selecciona una consola arriba para activar el buscador.</p>
+
+                  {/* Right Column: Game Search */}
+                  <div className="lg:w-2/3">
+                    {selectedConsole ? (
+                      <div className="animate-fade-in">
+                        <GameSearch platformId={selectedConsole} onSelectGame={handleGameSelect} />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full min-h-[250px] border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/50 text-slate-500 p-8 text-center">
+                        <p className="max-w-xs">Por favor selecciona una consola arriba para activar el buscador inteligente.</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </section>
