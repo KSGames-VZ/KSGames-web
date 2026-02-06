@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Info } from "lucide-react";
 
 interface GameSearchProps {
     platformId: number | null;
@@ -60,6 +60,14 @@ export default function GameSearch({ platformId, onSelectGame }: GameSearchProps
 
             {results.length > 0 && (
                 <div className="space-y-6">
+                    {/* Nota informativa */}
+                    <div className="bg-amber-900/10 border border-amber-500/30 rounded-xl p-4 flex gap-3 animate-in fade-in slide-in-from-top-2 duration-700 shadow-lg shadow-amber-900/5">
+                        <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-sm text-slate-300 leading-relaxed italic">
+                            ¿No encuentras tu juego? Si no está en el catálogo, <span className="text-amber-500 font-semibold">puedes seguir con la venta igualmente</span>. Al dirigirte al WhatsApp, pregunta y envía la imagen para verificarlo.
+                        </p>
+                    </div>
+
                     <div className="grid grid-cols-2 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {results.slice(0, visibleCount).map((game) => (
                             <button
