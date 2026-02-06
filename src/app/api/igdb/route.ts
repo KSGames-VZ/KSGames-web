@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         }
 
         const token = await getAccessToken();
-        
+
         // CORRECCIÓN: Se eliminó "NEXT_PUBLIC_" aquí también
         const clientId = process.env.IGDB_CLIENT_ID!;
 

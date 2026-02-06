@@ -27,8 +27,8 @@ export default function ConsoleSelector({ selectedConsole, onSelect }: ConsoleSe
             {/* Mobile Fade Overlay */}
             <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-slate-900 to-transparent pointer-events-none z-10 md:hidden" />
 
-            <div className="w-full overflow-x-auto py-6 no-scrollbar snap-x snap-mandatory px-4">
-                <div className="flex gap-4 min-w-max">
+            <div className="w-full overflow-x-auto py-8 no-scrollbar snap-x snap-mandatory px-6">
+                <div className="flex gap-4 md:gap-6 min-w-max pb-4">
                     {CONSOLES.map((console) => {
                         const Icon = console.icon;
                         const isSelected = selectedConsole === console.id;

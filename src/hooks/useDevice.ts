@@ -2,21 +2,33 @@
 
 import { useState, useEffect } from "react";
 
+export type DeviceType = "mobile" | "desktop";
+
 export function useDevice() {
-    const [isMobile, setIsMobile] = useState(false);
-    const [isDesktop, setIsDesktop] = useState(false);
+    const [device, setDevice] = useState<DeviceType>("desktop");
 
     useEffect(() => {
-        const mql = window.matchMedia("(max-width: 768px)");
-        const onChange = () => {
-            setIsMobile(mql.matches);
-            setIsDesktop(!mql.matches);
+        const checkDevice = () => {
+            // Typically mobile is < 768px (MD breakpoint in Tailwind)
+            if (window.innerWidth < 768) {
+                setDevice("mobile");
+            } else {
+                setDevice("desktop");
+            }
         };
 
-        onChange();
-        mql.addEventListener("change", onChange);
-        return () => mql.removeEventListener("change", onChange);
+        // Initial check
+        checkDevice();
+
+        // Add listener for window resize
+        window.addEventListener("resize", checkDevice);
+
+        return () => window.removeEventListener("resize", checkDevice);
     }, []);
 
-    return { isMobile, isDesktop };
+    return {
+        device,
+        isMobile: device === "mobile",
+        isDesktop: device === "desktop",
+    };
 }
